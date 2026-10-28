@@ -1,0 +1,8 @@
+{
+  "schema": "cjh.ping.v1",
+  "request_id": "pilot-20261028-public-file-001",
+  "job_type": "ping",
+  "target": "render-free-web",
+  "read_only": true,
+  "execution_enabled": true
+}
