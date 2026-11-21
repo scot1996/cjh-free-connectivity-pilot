@@ -1,0 +1,40 @@
+name: Mac-off cloud application and network proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/mac-off-cloud-proof.yml"
+      - "tests/cloud_mac_off_probe.py"
+      - "tests/test_public_cloud_app.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-off-proof-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  public-cloud-proof:
+    # The exact public connectivity-pilot repository only: no production.
+    if: github.repository == 'scot1996/cjh-free-connectivity-pilot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout only the public pilot, no persisted Git credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Confirm disposable Linux cloud environment
+        run: |
+          test "$RUNNER_OS" = "Linux"
+          test "$GITHUB_REPOSITORY" = "scot1996/cjh-free-connectivity-pilot"
+          python3 --version
+      - name: Test actual application contract without external services
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Start live app and verify outbound HTTPS on hosted Linux
+        run: python3 tests/cloud_mac_off_probe.py
