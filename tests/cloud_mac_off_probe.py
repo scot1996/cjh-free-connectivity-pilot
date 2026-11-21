@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def get_json(url):
     with urlopen(url, timeout=15) as res:
-        return res.status, json.loads(res.read(8193))
+        return res.status, json.loads(res.read(8193)), res.headers.get("X-Content-Type-Options")
 
 
 def main():
@@ -40,12 +40,14 @@ def main():
             if process.poll() is not None:
                 raise RuntimeError("Pilot app exited before HTTP health check")
             try:
-                status, health = get_json(f"http://127.0.0.1:{port}/health")
+                status, health, protection = get_json(f"http://127.0.0.1:{port}/health")
                 break
             except (ConnectionError, URLError, TimeoutError):
                 time.sleep(0.1)
         if health is None:
             raise AssertionError("Pilot app failed to start on hosted Linux")
+        if protection != "nosniff":
+            raise AssertionError("Cloud app lacks nosniff response protection")
         if status != 200 or health.get("status") != "ready":
             raise AssertionError("Cloud app HTTP health check failed")
         if health.get("task_execution") is not False:
@@ -55,7 +57,9 @@ def main():
 
         # The running Python app makes a real public HTTPS request; this also
         # checks outbound internet. No login, private repository or data.
-        status, public = get_json(f"http://127.0.0.1:{port}/task/1")
+        status, public, protection = get_json(f"http://127.0.0.1:{port}/task/1")
+        if protection != "nosniff":
+            raise AssertionError("Live cloud task response lacks nosniff protection")
         if status != 200 or public.get("status") != "worker_online":
             raise AssertionError("Cloud app could not fetch allowed public GitHub file")
         if public.get("source") != "public_github_file":
@@ -66,6 +70,7 @@ def main():
             "result": "PASS",
             "runner": "github_hosted_linux",
             "app_http": "PASS",
+            "response_security_header": "PASS",
             "outbound_public_https": "PASS",
             "mac_used": False,
             "business_data": False,
